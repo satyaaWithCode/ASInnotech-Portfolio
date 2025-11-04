@@ -30,7 +30,7 @@ export default function AboutSection() {
           ambitious ideas into scalable, secure, and intelligent digital experiences.{" "}
           <br className="hidden sm:block" />
           Founded in{" "}
-          <span className="text-cyan-300 font-semibold">February 2025</span> and headquartered in{" "}
+          <span className="text-cyan-300 font-semibold">February 2021</span> and headquartered in{" "}
           <span className="text-cyan-300 font-semibold">Bhubaneswar, Odisha, India</span>, our
           company is driven by innovation and excellence. We specialize in designing
           enterprise-grade systems, cloud-native architectures, and user-centric products that
