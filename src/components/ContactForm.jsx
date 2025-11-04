@@ -3,24 +3,44 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Phone } from "lucide-react";
 
 export default function ContactSection() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [msg, setMsg] = useState("");
   const [sending, setSending] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [toast, setToast] = useState(null);
+  const [toast, setToast] = useState(null); // { type, msg }
+  const toastTimer = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
+  }, []);
+
+  function showToast(type, message, duration = 3200) {
+    if (toastTimer.current) {
+      clearTimeout(toastTimer.current);
+      toastTimer.current = null;
+    }
+    setToast({ type, msg: message });
+    toastTimer.current = setTimeout(() => setToast(null), duration);
+  }
 
   async function handleCopyEmail() {
     try {
       await navigator.clipboard.writeText("asinnotechsolutions@gmail.com");
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {}
+      showToast("success", "Email copied to clipboard");
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      showToast("error", "Unable to copy email");
+    }
   }
 
   async function handleSubmit(e) {
@@ -30,22 +50,23 @@ export default function ContactSection() {
       const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, message: msg }),
+        body: JSON.stringify({ name, email, phone, message: msg }),
       });
-      const data = await res.json();
-      if (res.ok && data.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && (data.ok || data.success || data.status === "ok")) {
         setName("");
         setEmail("");
+        setPhone("");
         setMsg("");
-        setToast({ type: "success", msg: "Message sent — we will contact you soon." });
+        showToast("success", "Message sent — we will contact you soon.");
       } else {
-        setToast({ type: "error", msg: "Failed to send — try again later." });
+        const serverMsg = data?.msg || "Failed to send — try again later.";
+        showToast("error", serverMsg);
       }
     } catch {
-      setToast({ type: "error", msg: "Network error — try again later." });
+      showToast("error", "Network error — try again later.");
     } finally {
       setSending(false);
-      setTimeout(() => setToast(null), 3800);
     }
   }
 
@@ -56,7 +77,6 @@ export default function ContactSection() {
       style={{ transform: "translateZ(0)" }}
     >
       <div className="mx-auto px-4 sm:px-6 lg:px-12 max-w-5xl">
-        {/* Title */}
         <motion.h2
           initial={{ opacity: 0, y: 18 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -71,7 +91,6 @@ export default function ContactSection() {
           within 24–48 hours.
         </p>
 
-        {/* Card wrapper */}
         <div className="mx-auto w-full">
           <div className="mx-auto bg-[#02101F]/80 border border-white/6 rounded-2xl p-4 sm:p-6 md:p-8 shadow-[0_18px_60px_rgba(2,10,23,0.6)]">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
@@ -91,6 +110,7 @@ export default function ContactSection() {
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Jane Doe"
                     className="mt-2 w-full rounded-md bg-[#011528] border border-white/6 px-4 py-3 text-gray-100 text-sm sm:text-base placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/30 transition"
+                    required
                   />
                 </label>
 
@@ -103,6 +123,19 @@ export default function ContactSection() {
                     placeholder="you@company.com"
                     type="email"
                     required
+                    className="mt-2 w-full rounded-md bg-[#011528] border border-white/6 px-4 py-3 text-gray-100 text-sm sm:text-base placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/30 transition"
+                  />
+                </label>
+
+                <label className="block mb-4">
+                  <span className="text-sm text-gray-300">Phone Number</span>
+                  <motion.input
+                    whileFocus={{ scale: 1.01 }}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+91 9876543210"
+                    type="tel"
+                    pattern="[0-9+\\- ()]{7,20}"
                     className="mt-2 w-full rounded-md bg-[#011528] border border-white/6 px-4 py-3 text-gray-100 text-sm sm:text-base placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/30 transition"
                   />
                 </label>
@@ -120,9 +153,10 @@ export default function ContactSection() {
                   />
                 </label>
 
-                {/* Buttons + inline toast container */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-3">
-                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                {/* === Layout that keeps send+gmail in a vertical column AND shows toast to the right on md+ screens === */}
+                <div className="flex flex-col md:flex-row items-center md:items-start md:justify-start gap-4">
+                  {/* Left column: send button + gmail (stacked) */}
+                  <div className="flex flex-col items-center md:items-start gap-2">
                     <motion.button
                       whileHover={{ scale: 1.03 }}
                       type="submit"
@@ -139,49 +173,48 @@ export default function ContactSection() {
                       )}
                     </motion.button>
 
-                    {/* Inline toast */}
-                    <div className="w-full sm:w-auto">
-                      <AnimatePresence>
-                        {toast && (
-                          <motion.div
-                            initial={{ opacity: 0, x: -6 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -6 }}
-                            transition={{ duration: 0.28 }}
-                            role="status"
-                            aria-live="polite"
-                            className={`mt-3 sm:mt-0 sm:ml-3 inline-flex items-center px-3 py-2 rounded-full text-sm font-medium shadow-sm ${
-                              toast.type === "success"
-                                ? "bg-emerald-500/95 text-white"
-                                : "bg-rose-500/95 text-white"
-                            }`}
-                          >
-                            <span className="truncate">{toast.msg}</span>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
+                    {/* Gmail button placed under send button */}
+                    <div className="mt-2">
+                      <button
+                        type="button"
+                        onClick={handleCopyEmail}
+                        className="inline-flex items-center gap-2 px-3 py-2 border border-white/6 rounded-full bg-white/3 text-sm text-gray-100 hover:bg-white/6 transition"
+                      >
+                        <Mail className="w-4 h-4 text-cyan-300" />
+                        <span className="truncate">asinnotechsolutions@gmail.com</span>
+                      </button>
+                      {copied && (
+                        <span className="text-sm text-cyan-300 ml-3 hidden sm:inline">Copied</span>
+                      )}
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleCopyEmail}
-                      className="inline-flex items-center gap-2 px-3 py-2 border border-white/6 rounded-full bg-white/3 text-sm text-gray-100 hover:bg-white/6 transition w-full sm:w-auto justify-center"
-                    >
-                      <Mail className="w-4 h-4 text-cyan-300" />
-                      <span className="truncate">asinnotechsolutions@gmail.com</span>
-                    </button>
-                    {copied && (
-                      <span className="text-sm text-cyan-300 text-center w-full sm:w-auto">
-                        Copied
-                      </span>
-                    )}
+                  {/* Right area: toast — positioned to the right on md+, below on small */}
+                  <div className="w-full md:w-auto flex justify-center md:justify-start">
+                    <AnimatePresence>
+                      {toast && (
+                        <motion.div
+                          key={toast.msg}
+                          initial={{ opacity: 0, x: 6, y: -6 }}
+                          animate={{ opacity: 1, x: 0, y: 0 }}
+                          exit={{ opacity: 0, x: 6, y: -6 }}
+                          transition={{ duration: 0.28 }}
+                          className={`px-4 py-2 rounded-full text-sm font-medium shadow-sm ${
+                            toast.type === "success" ? "bg-emerald-500/95 text-white" : "bg-rose-500/95 text-white"
+                          }`}
+                          role="status"
+                          aria-live="polite"
+                        >
+                          {toast.msg}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
+
               </motion.form>
 
-              {/* Sidebar */}
+              {/* Sidebar (unchanged) */}
               <motion.aside
                 initial={{ opacity: 0, x: 12 }}
                 whileInView={{ opacity: 1, x: 0 }}
@@ -205,9 +238,7 @@ export default function ContactSection() {
                         className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-white/3 border border-white/6 hover:bg-white/6 transition justify-center sm:justify-start"
                       >
                         <Mail className="w-4 h-4 text-cyan-300" />
-                        <span className="text-sm text-gray-100">
-                          asinnotechsolutions@gmail.com
-                        </span>
+                        <span className="text-sm text-gray-100">asinnotechsolutions@gmail.com</span>
                       </a>
 
                       <a
@@ -230,9 +261,7 @@ export default function ContactSection() {
 
                   <div>
                     <h4 className="text-lg font-semibold text-white">Working Hours</h4>
-                    <p className="text-sm text-gray-300 mt-2">
-                      Mon — Fri: 9:30am — 6:30pm IST
-                    </p>
+                    <p className="text-sm text-gray-300 mt-2">Mon — Fri: 9:30am — 6:30pm IST</p>
                   </div>
 
                   <div className="mt-auto text-sm text-gray-400">
